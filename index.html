@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Incontro scuola-famiglia 02.12.26</title>
+  <!-- Tailwind CSS per layout responsive e stili ad alto contrasto -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter per la massima leggibilità su smartphone -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc; /* slate-50 */
+      color: #0f172a; /* slate-900 */
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Migliora la visibilità del focus per accessibilità */
+    button:focus-visible, input:focus-visible {
+      outline: 3px solid #15803d;
+      outline-offset: 2px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased">
+
+  <!-- CONTENITORE PRINCIPALE MOBILE-FIRST -->
+  <main class="w-full max-w-lg mx-auto px-4 pt-6 pb-12 flex-grow">
+    
+    <!-- INTESTAZIONE CHIARA -->
+    <header class="text-center mb-6">
+      <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-800 mb-3 shadow-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+      <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+        Incontro scuola-famiglia 02.12.26
+      </h1>
+      <p class="mt-2.5 text-lg font-medium text-slate-700 leading-snug bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm">
+        <span class="font-bold text-emerald-700">1.</span> Tocca un orario libero (verde) &bull; 
+        <span class="font-bold text-emerald-700">2.</span> Inserisci il nome del bambino/a &bull; 
+        <span class="font-bold text-emerald-700">3.</span> Conferma
+      </p>
+    </header>
+
+    <!-- BANNER MESSAGGI / AVVISI (Sostituisce qualsiasi alert() di sistema) -->
+    <div id="statusBanner" class="hidden mb-5 p-4 rounded-2xl border-2 text-lg font-semibold shadow-sm transition-all" role="alert">
+      <div class="flex items-start justify-between gap-3">
+        <p id="statusBannerText" class="leading-snug"></p>
+        <button id="closeBannerBtn" type="button" class="text-current opacity-70 hover:opacity-100 p-1 rounded-lg font-bold text-xl leading-none" aria-label="Chiudi avviso">&times;</button>
+      </div>
+    </div>
+
+    <!-- BOX RIEPILOGO PRENOTAZIONE PERSONALE (Visibile se l'utente ha già prenotato) -->
+    <section id="myBookingCard" class="hidden mb-6 bg-emerald-50 border-2 border-emerald-600 rounded-2xl p-5 shadow-md">
+      <div class="flex items-center gap-2 text-emerald-800 font-bold text-sm uppercase tracking-wider mb-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+        </svg>
+        La tua prenotazione è confermata
+      </div>
+      <div class="mt-2 bg-white rounded-xl p-4 border border-emerald-200 flex items-center justify-between">
+        <div>
+          <p class="text-slate-500 text-base font-medium">Bambino/a</p>
+          <p id="myBookingName" class="text-xl font-bold text-slate-900 break-words"></p>
+        </div>
+        <div class="text-right pl-3">
+          <p class="text-slate-500 text-base font-medium">Orario</p>
+          <p id="myBookingTime" class="text-3xl font-extrabold text-emerald-700"></p>
+        </div>
+      </div>
+      <button id="cancelMyBookingBtn" type="button" class="mt-4 w-full py-3.5 px-4 bg-white hover:bg-red-50 active:bg-red-100 text-red-700 border-2 border-red-300 rounded-xl text-lg font-bold transition-colors shadow-sm">
+        Annulla o cambia orario
+      </button>
+    </section>
+
+    <!-- STATO DI CARICAMENTO INIZIALE (NON BLOCCANTE, NASCOSTO ALL'AVVIO) -->
+    <div id="loadingIndicator" class="hidden text-center py-8 bg-white rounded-2xl border border-slate-200 shadow-sm mb-4">
+      <div class="inline-block w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-2"></div>
+      <p class="text-base font-semibold text-slate-700">Sincronizzazione orari in corso...</p>
+    </div>
+
+    <!-- CONTATORE SLOT LIBERI -->
+    <div id="slotsSummaryBar" class="flex items-center justify-between mb-3 px-1">
+      <span class="text-lg font-bold text-slate-800">Scegli un orario:</span>
+      <span id="availableCountBadge" class="text-base font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">
+        25 liberi su 25
+      </span>
+    </div>
+
+    <!-- LISTA / GRIGLIA DEI 25 APPUNTAMENTI -->
+    <section id="slotsContainer" class="space-y-3" aria-label="Elenco orari disponibili">
+      <!-- Le card degli orari vengono generate dinamicamente qui -->
+    </section>
+
+  </main>
+
+  <!-- FOOTER DISCRETO CON ACCESSO AREA ORGANIZZATORE -->
+  <footer class="w-full max-w-lg mx-auto px-4 py-6 text-center border-t border-slate-200">
+    <button id="openAdminBtn" type="button" class="text-sm font-medium text-slate-500 hover:text-slate-800 underline underline-offset-4 py-2 px-4 rounded-lg">
+      Area Organizzatore
+    </button>
+  </footer>
+
+  <!-- ===================================================================== -->
+  <!-- MODALE 1: CONFERMA PRENOTAZIONE UTENTE                                 -->
+  <!-- ===================================================================== -->
+  <div id="bookingModal" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-3 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-200 animate-fade-in">
+      <div class="text-center mb-5">
+        <span class="inline-block px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-base mb-2">
+          Orario selezionato
+        </span>
+        <h2 id="modalTitle" class="text-4xl font-extrabold text-slate-900">17:15</h2>
+      </div>
+
+      <form id="bookingForm" class="space-y-5" novalidate>
+        <div>
+          <label for="userNameInput" class="block text-lg font-bold text-slate-800 mb-2">
+            Inserisci il nome del bambino/a
+          </label>
+          <input
+            type="text"
+            id="userNameInput"
+            name="userName"
+            placeholder="Es. Leonardo Rossi"
+            autocomplete="off"
+            maxlength="45"
+            required
+            class="w-full px-4 py-4 text-xl font-semibold text-slate-900 bg-slate-50 border-2 border-slate-300 rounded-2xl focus:bg-white focus:border-emerald-600 transition-colors"
+          />
+          <p id="modalErrorMsg" class="hidden mt-2 text-base font-bold text-red-600"></p>
+        </div>
+
+        <div class="space-y-3 pt-1">
+          <button
+            type="submit"
+            id="confirmBookingBtn"
+            class="w-full py-4 px-5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-2xl text-xl font-extrabold shadow-md transition-colors flex items-center justify-center gap-2"
+          >
+            <span>Conferma prenotazione</span>
+          </button>
+
+          <button
+            type="button"
+            id="closeModalBtn"
+            class="w-full py-3.5 px-5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 rounded-2xl text-lg font-bold transition-colors"
+          >
+            Indietro
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODALE 2: CONFERMA ANNULLAMENTO PRENOTAZIONE UTENTE                   -->
+  <!-- ===================================================================== -->
+  <div id="cancelConfirmModal" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-200 text-center">
+      <h3 class="text-2xl font-extrabold text-slate-900 mb-2">Vuoi annullare?</h3>
+      <p id="cancelConfirmText" class="text-lg text-slate-700 mb-6">
+        L'orario tornerà subito libero e potrai sceglierne un altro.
+      </p>
+      <div class="space-y-3">
+        <button id="confirmCancelActionBtn" type="button" class="w-full py-4 px-5 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-xl font-extrabold shadow-md">
+          Sì, libera questo orario
+        </button>
+        <button id="abortCancelActionBtn" type="button" class="w-full py-3.5 px-5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-2xl text-lg font-bold">
+          No, mantieni orario
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODALE 3: AREA ORGANIZZATORE (PIN + GESTIONE COMPLETA)                -->
+  <!-- ===================================================================== -->
+  <div id="adminModal" class="hidden fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto" role="dialog" aria-modal="true">
+    <div class="bg-white w-full max-w-lg rounded-3xl p-5 sm:p-6 shadow-2xl border border-slate-200 my-auto max-h-[92vh] flex flex-col">
+      
+      <!-- Intestazione Modale Admin -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+        <h3 class="text-xl font-extrabold text-slate-900">Area Organizzatore</h3>
+        <button id="closeAdminModalBtn" type="button" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-base font-bold text-slate-700">
+          Chiudi
+        </button>
+      </div>
+
+      <!-- STEP A: INSERIMENTO PIN -->
+      <div id="adminPinSection" class="py-6 space-y-4">
+        <p class="text-base text-slate-700 font-medium">
+          Inserisci il PIN riservato per gestire gli appuntamenti:
+        </p>
+        <form id="adminPinForm" class="space-y-4">
+          <input
+            type="password"
+            inputmode="numeric"
+            id="adminPinInput"
+            placeholder="Inserisci PIN"
+            maxlength="8"
+            class="w-full px-4 py-3.5 text-xl font-bold text-center tracking-widest bg-slate-50 border-2 border-slate-300 rounded-2xl focus:border-slate-800"
+          />
+          <p id="adminPinError" class="hidden text-center text-red-600 font-bold text-base">PIN non corretto.</p>
+          <button type="submit" class="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-lg font-bold">
+            Accedi
+          </button>
+        </form>
+      </div>
+
+      <!-- STEP B: PANNELLO DI CONTROLLO ORGANIZZATORE -->
+      <div id="adminDashboardSection" class="hidden flex-col overflow-hidden pt-4 space-y-4">
+        
+        <!-- Pulsante Copia per WhatsApp -->
+        <button id="copyWhatsappBtn" type="button" class="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-lg font-extrabold shadow-sm flex items-center justify-center gap-2 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+          </svg>
+          <span id="copyWhatsappBtnText">Copia elenco per WhatsApp</span>
+        </button>
+
+        <!-- Elenco cronologico completo -->
+        <div class="overflow-y-auto pr-1 space-y-2 max-h-[48vh] border-y border-slate-200 py-3" id="adminSlotsList">
+          <!-- Popolato via JS -->
+        </div>
+
+        <!-- Azione di reset totale con doppia conferma inline -->
+        <div class="pt-1">
+          <button id="resetAllTriggerBtn" type="button" class="w-full py-3 px-4 bg-red-50 hover:bg-red-100 text-red-700 border border-red-300 rounded-xl text-base font-bold">
+            Azzera tutte le prenotazioni
+          </button>
+          <div id="resetAllConfirmBox" class="hidden mt-2 p-3 bg-red-100 rounded-xl border border-red-300 text-center space-y-2">
+            <p class="text-sm font-bold text-red-900">Sicuro di voler cancellare TUTTI i 25 appuntamenti?</p>
+            <div class="flex gap-2">
+              <button id="confirmResetAllBtn" type="button" class="flex-1 py-2 bg-red-700 text-white rounded-lg font-bold text-sm">
+                Sì, azzera tutto
+              </button>
+              <button id="cancelResetAllBtn" type="button" class="flex-1 py-2 bg-white text-slate-800 rounded-lg font-bold text-sm">
+                Annulla
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- LOGICA APPLICATIVA & FIREBASE FIRESTORE IN TEMPO REALE                -->
+  <!-- ===================================================================== -->
+  <!-- LOGICA APPLICATIVA RESILIENTE (LOCALSTORAGE + BROADCAST + FIRESTORE)  -->
+  <!-- ===================================================================== -->
+  <script type="module">
+    // =========================================================================
+    // 1. CONFIGURAZIONE COSTANTI E GENERAZIONE DEI 25 ORARI
+    // =========================================================================
+    const EVENT_TITLE = "Incontro scuola-famiglia 02.12.26";
+    const ADMIN_PIN = "251125";
+    const TOTAL_SLOTS = 25;
+    const START_HOUR = 17;
+    const START_MINUTE = 15;
+    const INTERVAL_MINUTES = 7;
+
+    const STORAGE_KEY_BOOKINGS = "scuola_famiglia_021226_bookings_v1";
+    const STORAGE_KEY_CLIENT_ID = "scuola_famiglia_021226_client_id_v1";
+    const BROADCAST_CHANNEL_NAME = "scuola_famiglia_021226_sync_channel";
+
+    /**
+     * Genera l'array dei 25 slot orari dalle 17:15 alle 20:03 (ogni 7 minuti).
+     */
+    function generateTimeSlots() {
+      const slots = [];
+      let totalMinutes = START_HOUR * 60 + START_MINUTE;
+      for (let i = 0; i < TOTAL_SLOTS; i++) {
+        const hours = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+        const formattedTime = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+        const slotId = `slot_${String(i).padStart(2, '0')}`;
+        slots.push({
+          id: slotId,
+          index: i,
+          time: formattedTime
+        });
+        totalMinutes += INTERVAL_MINUTES;
+      }
+      return slots;
+    }
+
+    const TIME_SLOTS = generateTimeSlots();
+
+    /**
+     * Restituisce o genera un identificativo stabile per questo dispositivo/browser.
+     */
+    function getOrCreateClientId() {
+      try {
+        let existingId = localStorage.getItem(STORAGE_KEY_CLIENT_ID);
+        if (!existingId) {
+          existingId = "dev_" + Math.random().toString(36).slice(2, 11) + "_" + Date.now().toString(36);
+          localStorage.setItem(STORAGE_KEY_CLIENT_ID, existingId);
+        }
+        return existingId;
+      } catch (_) {
+        return "dev_session_fallback";
+      }
+    }
+
+    // =========================================================================
+    // 2. STATO APPLICATIVO E CANALI DI SINCRONIZZAZIONE LOCALE/REMOTA
+    // =========================================================================
+    const currentClientId = getOrCreateClientId();
+    let bookingsMap = {}; // Mappa slotId -> { name, userId, time, updatedAt }
+    let selectedSlotForModal = null;
+    let isAdminUnlocked = false;
+
+    // Riferimenti per eventuale sincronizzazione Firestore opzionale (non bloccante)
+    let firestoreDb = null;
+    let firestoreAppId = "default-app-id";
+    let firestoreOps = null;
+    let firestoreReady = false;
+
+    // Canale BroadcastChannel per aggiornare istantaneamente altre schede dello stesso browser
+    let broadcastChannel = null;
+    try {
+      if (typeof BroadcastChannel !== "undefined") {
+        broadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
+      }
+    } catch (_) {
+      broadcastChannel = null;
+    }
+
+    // Riferimenti DOM principali
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const slotsSummaryBar = document.getElementById('slotsSummaryBar');
+    const availableCountBadge = document.getElementById('availableCountBadge');
+    const slotsContainer = document.getElementById('slotsContainer');
+    const statusBanner = document.getElementById('statusBanner');
+    const statusBannerText = document.getElementById('statusBannerText');
+    const closeBannerBtn = document.getElementById('closeBannerBtn');
+
+    // Box prenotazione personale
+    const myBookingCard = document.getElementById('myBookingCard');
+    const myBookingName = document.getElementById('myBookingName');
+    const myBookingTime = document.getElementById('myBookingTime');
+    const cancelMyBookingBtn = document.getElementById('cancelMyBookingBtn');
+
+    // Modale prenotazione
+    const bookingModal = document.getElementById('bookingModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const bookingForm = document.getElementById('bookingForm');
+    const userNameInput = document.getElementById('userNameInput');
+    const modalErrorMsg = document.getElementById('modalErrorMsg');
+    const confirmBookingBtn = document.getElementById('confirmBookingBtn');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+
+    // Modale conferma annullamento
+    const cancelConfirmModal = document.getElementById('cancelConfirmModal');
+    const confirmCancelActionBtn = document.getElementById('confirmCancelActionBtn');
+    const abortCancelActionBtn = document.getElementById('abortCancelActionBtn');
+
+    // Modale Organizzatore
+    const openAdminBtn = document.getElementById('openAdminBtn');
+    const adminModal = document.getElementById('adminModal');
+    const closeAdminModalBtn = document.getElementById('closeAdminModalBtn');
+    const adminPinSection = document.getElementById('adminPinSection');
+    const adminPinForm = document.getElementById('adminPinForm');
+    const adminPinInput = document.getElementById('adminPinInput');
+    const adminPinError = document.getElementById('adminPinError');
+    const adminDashboardSection = document.getElementById('adminDashboardSection');
+    const adminSlotsList = document.getElementById('adminSlotsList');
+    const copyWhatsappBtn = document.getElementById('copyWhatsappBtn');
+    const copyWhatsappBtnText = document.getElementById('copyWhatsappBtnText');
+    const resetAllTriggerBtn = document.getElementById('resetAllTriggerBtn');
+    const resetAllConfirmBox = document.getElementById('resetAllConfirmBox');
+    const confirmResetAllBtn = document.getElementById('confirmResetAllBtn');
+    const cancelResetAllBtn = document.getElementById('cancelResetAllBtn');
+
+    // =========================================================================
+    // 3. FUNZIONI DI UTILITÀ UI, PERSISTENZA LOCALE E HELPER
+    // =========================================================================
+    function showBanner(message, type = 'info') {
+      statusBannerText.textContent = message;
+      statusBanner.classList.remove(
+        'hidden',
+        'bg-emerald-50', 'border-emerald-500', 'text-emerald-900',
+        'bg-amber-50', 'border-amber-500', 'text-amber-900',
+        'bg-red-50', 'border-red-500', 'text-red-900'
+      );
+
+      if (type === 'success') {
+        statusBanner.classList.add('bg-emerald-50', 'border-emerald-500', 'text-emerald-900');
+      } else if (type === 'warning') {
+        statusBanner.classList.add('bg-amber-50', 'border-amber-500', 'text-amber-900');
+      } else {
+        statusBanner.classList.add('bg-red-50', 'border-red-500', 'text-red-900');
+      }
+      statusBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function hideBanner() {
+      statusBanner.classList.add('hidden');
+    }
+
+    closeBannerBtn.addEventListener('click', hideBanner);
+
+    function loadLocalBookings() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_BOOKINGS);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      } catch (err) {
+        console.warn("Lettura localStorage non disponibile:", err);
+        return {};
+      }
+    }
+
+    function saveLocalBookings(mapToSave, notifyPeers = true) {
+      try {
+        localStorage.setItem(STORAGE_KEY_BOOKINGS, JSON.stringify(mapToSave));
+      } catch (err) {
+        console.warn("Salvataggio localStorage non disponibile:", err);
+      }
+
+      if (notifyPeers && broadcastChannel) {
+        try {
+          broadcastChannel.postMessage({ type: "BOOKINGS_UPDATED", bookings: mapToSave });
+        } catch (_) {}
+      }
+    }
+
+    /**
+     * Restituisce l'eventuale prenotazione attiva di questo dispositivo/utente.
+     */
+    function getMyCurrentBooking() {
+      for (const slot of TIME_SLOTS) {
+        const booking = bookingsMap[slot.id];
+        if (booking && booking.userId === currentClientId) {
+          return { slotId: slot.id, ...booking };
+        }
+      }
+      return null;
+    }
+
+    // =========================================================================
+    // 4. AVVIO IMMEDIATO E SINCRONIZZAZIONE NON BLOCCANTE
+    // =========================================================================
+    function initImmediateApp() {
+      // 1. Carica subito i dati locali e renderizza l'interfaccia in modo sincrono
+      loadingIndicator.classList.add('hidden');
+      bookingsMap = loadLocalBookings();
+      renderAllUI();
+
+      // 2. Ascolta modifiche da altre schede/finestre dello stesso browser
+      window.addEventListener("storage", (event) => {
+        if (event.key === STORAGE_KEY_BOOKINGS) {
+          bookingsMap = loadLocalBookings();
+          renderAllUI();
+        }
+      });
+
+      if (broadcastChannel) {
+        broadcastChannel.onmessage = (event) => {
+          if (event.data && event.data.type === "BOOKINGS_UPDATED" && event.data.bookings) {
+            bookingsMap = event.data.bookings;
+            saveLocalBookings(bookingsMap, false);
+            renderAllUI();
+          }
+        };
+      }
+
+      // 3. Tenta in background (senza mai bloccare l'UI) la connessione a Firestore se configurata
+      tryOptionalFirestoreBackgroundSync();
+    }
+
+    async function tryOptionalFirestoreBackgroundSync() {
+      try {
+        const hasAppId = typeof __app_id !== "undefined" && Boolean(__app_id);
+        const hasConfig = typeof __firebase_config !== "undefined" && Boolean(__firebase_config);
+        if (!hasAppId || !hasConfig) {
+          return;
+        }
+
+        const parsedConfig = JSON.parse(__firebase_config);
+        if (!parsedConfig || !parsedConfig.apiKey || !parsedConfig.projectId) {
+          return;
+        }
+
+        // Timeout di sicurezza così una rete assente o lenta non blocca nulla
+        const withTimeout = (promise, ms = 3500) =>
+          Promise.race([
+            promise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error("FIRESTORE_TIMEOUT")), ms))
+          ]);
+
+        const [appMod, authMod, fsMod] = await withTimeout(
+          Promise.all([
+            import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"),
+            import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"),
+            import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js")
+          ])
+        );
+
+        const fbApp = appMod.initializeApp(parsedConfig);
+        const fbAuth = authMod.getAuth(fbApp);
+        firestoreDb = fsMod.getFirestore(fbApp);
+        firestoreAppId = __app_id;
+        firestoreOps = fsMod;
+
+        if (typeof __initial_auth_token !== "undefined" && __initial_auth_token) {
+          await withTimeout(authMod.signInWithCustomToken(fbAuth, __initial_auth_token));
+        } else {
+          await withTimeout(authMod.signInAnonymously(fbAuth));
+        }
+
+        firestoreReady = true;
+
+        const appointmentsCol = fsMod.collection(
+          firestoreDb,
+          "artifacts",
+          firestoreAppId,
+          "public",
+          "data",
+          "appointments"
+        );
+
+        fsMod.onSnapshot(
+          appointmentsCol,
+          (snapshot) => {
+            const remoteMap = {};
+            snapshot.forEach((docSnap) => {
+              remoteMap[docSnap.id] = docSnap.data();
+            });
+            bookingsMap = remoteMap;
+            saveLocalBookings(bookingsMap, true);
+            renderAllUI();
+          },
+          (err) => {
+            console.warn("Listener Firestore in fallback locale:", err);
+          }
+        );
+      } catch (err) {
+        // Fallback automatico su localStorage/BroadcastChannel già attivo e funzionante
+        console.info("Modalità locale/browser attiva:", err.message || err);
+      }
+    }
+
+    // =========================================================================
+    // 5. RENDERING INTERFACCIA UTENTE E ORGANIZZATORE
+    // =========================================================================
+    function renderAllUI() {
+      loadingIndicator.classList.add('hidden');
+      slotsSummaryBar.classList.remove('hidden');
+      slotsContainer.classList.remove('hidden');
+
+      const myBooking = getMyCurrentBooking();
+
+      // Aggiorna box prenotazione personale in alto
+      if (myBooking) {
+        myBookingCard.classList.remove('hidden');
+        myBookingName.textContent = myBooking.name;
+        myBookingTime.textContent = myBooking.time;
+      } else {
+        myBookingCard.classList.add('hidden');
+      }
+
+      // Calcola contatore slot liberi
+      let freeCount = 0;
+      TIME_SLOTS.forEach((slot) => {
+        if (!bookingsMap[slot.id]) freeCount++;
+      });
+      availableCountBadge.textContent = `${freeCount} liberi su ${TOTAL_SLOTS}`;
+
+      // Genera card dei 25 orari
+      slotsContainer.innerHTML = '';
+      TIME_SLOTS.forEach((slot) => {
+        const booking = bookingsMap[slot.id];
+        const isMine = booking && booking.userId === currentClientId;
+        const isOccupied = Boolean(booking);
+
+        const card = document.createElement('button');
+        card.type = 'button';
+
+        if (isMine) {
+          card.className = "w-full text-left p-4 sm:p-5 rounded-2xl border-2 border-emerald-600 bg-emerald-50 shadow-sm flex items-center justify-between gap-3 transition-transform active:scale-[0.99]";
+          card.innerHTML = `
+            <div class="flex items-center gap-3.5">
+              <span class="text-2xl sm:text-3xl font-extrabold text-emerald-900 tabular-nums">${slot.time}</span>
+              <div>
+                <span class="inline-block text-xs font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-600 text-white">Il tuo turno</span>
+                <p class="text-lg font-bold text-slate-900 mt-0.5 break-words">${escapeHTML(booking.name)}</p>
+              </div>
+            </div>
+            <span class="text-sm font-bold text-emerald-800 underline shrink-0">Gestisci</span>
+          `;
+          card.addEventListener('click', () => {
+            myBookingCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          });
+        } else if (isOccupied) {
+          card.disabled = true;
+          card.className = "w-full text-left p-4 sm:p-5 rounded-2xl border border-slate-200 bg-slate-100/90 opacity-85 flex items-center justify-between gap-3 cursor-not-allowed";
+          card.innerHTML = `
+            <div class="flex items-center gap-3.5 min-w-0">
+              <span class="text-2xl sm:text-3xl font-bold text-slate-500 tabular-nums shrink-0">${slot.time}</span>
+              <div class="min-w-0">
+                <span class="inline-block text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-600">Occupato</span>
+                <p class="text-lg font-semibold text-slate-700 mt-0.5 truncate">${escapeHTML(booking.name)}</p>
+              </div>
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          `;
+        } else {
+          card.className = "w-full text-left p-4 sm:p-5 rounded-2xl border-2 border-emerald-500 bg-white hover:bg-emerald-50/70 active:bg-emerald-100 shadow-sm flex items-center justify-between gap-3 transition-all active:scale-[0.99]";
+          card.innerHTML = `
+            <div class="flex items-center gap-3.5">
+              <span class="text-2xl sm:text-3xl font-extrabold text-slate-900 tabular-nums">${slot.time}</span>
+              <span class="inline-flex items-center gap-1.5 text-base font-extrabold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                LIBERO
+              </span>
+            </div>
+            <span class="px-4 py-2 rounded-xl bg-emerald-600 text-white font-extrabold text-base shadow-xs shrink-0">
+              Prenota
+            </span>
+          `;
+          card.addEventListener('click', () => handleSelectFreeSlot(slot));
+        }
+
+        slotsContainer.appendChild(card);
+      });
+
+      if (isAdminUnlocked) {
+        renderAdminList();
+      }
+    }
+
+    function escapeHTML(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // =========================================================================
+    // 6. FLUSSO PRENOTAZIONE E ANNULLAMENTO UTENTE
+    // =========================================================================
+    function handleSelectFreeSlot(slot) {
+      hideBanner();
+      const existingBooking = getMyCurrentBooking();
+
+      if (existingBooking) {
+        showBanner(
+          `Hai già prenotato alle ${existingBooking.time} (${existingBooking.name}). Se vuoi cambiare orario, premi prima "Annulla o cambia orario" nel riquadro verde qui sopra.`,
+          "warning"
+        );
+        myBookingCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+
+      if (bookingsMap[slot.id]) {
+        showBanner(`L'orario ${slot.time} risulta già occupato. Scegli un altro orario libero.`, "warning");
+        renderAllUI();
+        return;
+      }
+
+      selectedSlotForModal = slot;
+      modalTitle.textContent = slot.time;
+      modalErrorMsg.classList.add('hidden');
+      userNameInput.value = '';
+      bookingModal.classList.remove('hidden');
+      setTimeout(() => userNameInput.focus(), 80);
+    }
+
+    closeModalBtn.addEventListener('click', () => {
+      bookingModal.classList.add('hidden');
+      selectedSlotForModal = null;
+    });
+
+    bookingForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!selectedSlotForModal) return;
+
+      const rawName = userNameInput.value.trim();
+      if (rawName.length < 2) {
+        modalErrorMsg.textContent = "Inserisci il nome del bambino/a per confermare (almeno 2 lettere).";
+        modalErrorMsg.classList.remove('hidden');
+        userNameInput.focus();
+        return;
+      }
+
+      const existingBooking = getMyCurrentBooking();
+      if (existingBooking) {
+        bookingModal.classList.add('hidden');
+        showBanner(`Hai già una prenotazione attiva alle ${existingBooking.time}.`, "warning");
+        return;
+      }
+
+      const slotToBook = selectedSlotForModal;
+      const newEntry = {
+        time: slotToBook.time,
+        index: slotToBook.index,
+        name: rawName,
+        userId: currentClientId,
+        updatedAt: Date.now()
+      };
+
+      confirmBookingBtn.disabled = true;
+      confirmBookingBtn.textContent = "Salvataggio...";
+
+      try {
+        if (firestoreReady && firestoreDb && firestoreOps) {
+          const slotDocRef = firestoreOps.doc(
+            firestoreDb,
+            "artifacts",
+            firestoreAppId,
+            "public",
+            "data",
+            "appointments",
+            slotToBook.id
+          );
+          await firestoreOps.runTransaction(firestoreDb, async (transaction) => {
+            const docSnap = await transaction.get(slotDocRef);
+            if (docSnap.exists()) {
+              throw new Error("SLOT_ALREADY_TAKEN");
+            }
+            transaction.set(slotDocRef, newEntry);
+          });
+        }
+
+        if (bookingsMap[slotToBook.id]) {
+          throw new Error("SLOT_ALREADY_TAKEN");
+        }
+
+        bookingsMap = {
+          ...bookingsMap,
+          [slotToBook.id]: newEntry
+        };
+        saveLocalBookings(bookingsMap, true);
+        renderAllUI();
+
+        bookingModal.classList.add('hidden');
+        selectedSlotForModal = null;
+        showBanner(`Perfetto! Appuntamento confermato per ${rawName} alle ${slotToBook.time}.`, "success");
+      } catch (err) {
+        bookingModal.classList.add('hidden');
+        if (err && err.message === "SLOT_ALREADY_TAKEN") {
+          showBanner(`Qualcun altro ha appena prenotato le ${slotToBook.time}. Scegli un altro orario libero.`, "warning");
+          renderAllUI();
+        } else {
+          console.error("Errore salvataggio prenotazione:", err);
+          showBanner("Si è verificato un problema durante il salvataggio. Riprova.", "error");
+        }
+      } finally {
+        confirmBookingBtn.disabled = false;
+        confirmBookingBtn.innerHTML = '<span>Conferma prenotazione</span>';
+      }
+    });
+
+    cancelMyBookingBtn.addEventListener('click', () => {
+      const myBooking = getMyCurrentBooking();
+      if (!myBooking) return;
+      cancelConfirmModal.classList.remove('hidden');
+    });
+
+    abortCancelActionBtn.addEventListener('click', () => {
+      cancelConfirmModal.classList.add('hidden');
+    });
+
+    confirmCancelActionBtn.addEventListener('click', async () => {
+      const myBooking = getMyCurrentBooking();
+      if (!myBooking) {
+        cancelConfirmModal.classList.add('hidden');
+        return;
+      }
+
+      confirmCancelActionBtn.disabled = true;
+      confirmCancelActionBtn.textContent = "Annullamento...";
+
+      try {
+        if (firestoreReady && firestoreDb && firestoreOps) {
+          const slotDocRef = firestoreOps.doc(
+            firestoreDb,
+            "artifacts",
+            firestoreAppId,
+            "public",
+            "data",
+            "appointments",
+            myBooking.slotId
+          );
+          await firestoreOps.deleteDoc(slotDocRef);
+        }
+
+        const updated = { ...bookingsMap };
+        delete updated[myBooking.slotId];
+        bookingsMap = updated;
+        saveLocalBookings(bookingsMap, true);
+        renderAllUI();
+
+        cancelConfirmModal.classList.add('hidden');
+        showBanner(`Prenotazione delle ${myBooking.time} annullata. Ora puoi scegliere un nuovo orario.`, "info");
+      } catch (error) {
+        console.error("Errore annullamento:", error);
+        cancelConfirmModal.classList.add('hidden');
+        showBanner("Errore durante l'annullamento. Riprova.", "error");
+      } finally {
+        confirmCancelActionBtn.disabled = false;
+        confirmCancelActionBtn.textContent = "Sì, libera questo orario";
+      }
+    });
+
+    // =========================================================================
+    // 7. AREA ORGANIZZATORE (PIN, ELENCO, COPIA WHATSAPP, SBLOCCO E RESET)
+    // =========================================================================
+    openAdminBtn.addEventListener('click', () => {
+      adminPinError.classList.add('hidden');
+      adminPinInput.value = '';
+      resetAllConfirmBox.classList.add('hidden');
+
+      if (isAdminUnlocked) {
+        adminPinSection.classList.add('hidden');
+        adminDashboardSection.classList.remove('hidden');
+        adminDashboardSection.classList.add('flex');
+        renderAdminList();
+      } else {
+        adminPinSection.classList.remove('hidden');
+        adminDashboardSection.classList.add('hidden');
+        adminDashboardSection.classList.remove('flex');
+      }
+
+      adminModal.classList.remove('hidden');
+      if (!isAdminUnlocked) {
+        setTimeout(() => adminPinInput.focus(), 80);
+      }
+    });
+
+    closeAdminModalBtn.addEventListener('click', () => {
+      adminModal.classList.add('hidden');
+    });
+
+    adminPinForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (adminPinInput.value.trim() === ADMIN_PIN) {
+        isAdminUnlocked = true;
+        adminPinError.classList.add('hidden');
+        adminPinSection.classList.add('hidden');
+        adminDashboardSection.classList.remove('hidden');
+        adminDashboardSection.classList.add('flex');
+        renderAdminList();
+      } else {
+        adminPinError.classList.remove('hidden');
+        adminPinInput.value = '';
+        adminPinInput.focus();
+      }
+    });
+
+    function renderAdminList() {
+      adminSlotsList.innerHTML = '';
+      TIME_SLOTS.forEach((slot) => {
+        const booking = bookingsMap[slot.id];
+        const row = document.createElement('div');
+        row.className = "flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-slate-50 gap-2";
+
+        if (booking) {
+          row.innerHTML = `
+            <div class="min-w-0">
+              <span class="font-extrabold text-slate-900 mr-2 tabular-nums">${slot.time}</span>
+              <span class="font-semibold text-emerald-800 break-words">${escapeHTML(booking.name)}</span>
+            </div>
+            <button type="button" data-slot-id="${slot.id}" class="free-slot-btn shrink-0 px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 rounded-lg text-xs font-extrabold">
+              Libera
+            </button>
+          `;
+        } else {
+          row.innerHTML = `
+            <div>
+              <span class="font-bold text-slate-500 mr-2 tabular-nums">${slot.time}</span>
+              <span class="text-sm text-slate-400 italic">Libero</span>
+            </div>
+          `;
+        }
+        adminSlotsList.appendChild(row);
+      });
+
+      adminSlotsList.querySelectorAll('.free-slot-btn').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const targetSlotId = btn.getAttribute('data-slot-id');
+          if (!targetSlotId) return;
+          btn.disabled = true;
+          btn.textContent = "...";
+          try {
+            if (firestoreReady && firestoreDb && firestoreOps) {
+              const slotDocRef = firestoreOps.doc(
+                firestoreDb,
+                "artifacts",
+                firestoreAppId,
+                "public",
+                "data",
+                "appointments",
+                targetSlotId
+              );
+              await firestoreOps.deleteDoc(slotDocRef);
+            }
+
+            const updated = { ...bookingsMap };
+            delete updated[targetSlotId];
+            bookingsMap = updated;
+            saveLocalBookings(bookingsMap, true);
+            renderAllUI();
+          } catch (error) {
+            console.error("Errore sblocco slot:", error);
+          }
+        });
+      });
+    }
+
+    copyWhatsappBtn.addEventListener('click', () => {
+      const lines = [`📅 *${EVENT_TITLE}*`, ""];
+      TIME_SLOTS.forEach((slot) => {
+        const booking = bookingsMap[slot.id];
+        if (booking) {
+          lines.push(`• *${slot.time}* - ${booking.name}`);
+        } else {
+          lines.push(`• *${slot.time}* - _Libero_`);
+        }
+      });
+
+      const formattedText = lines.join('\n');
+      const tempTextArea = document.createElement('textarea');
+      tempTextArea.value = formattedText;
+      tempTextArea.style.position = 'fixed';
+      tempTextArea.style.left = '-9999px';
+      document.body.appendChild(tempTextArea);
+      tempTextArea.select();
+
+      try {
+        document.execCommand('copy');
+        copyWhatsappBtnText.textContent = "Elenco copiato! Incolla su WhatsApp";
+        setTimeout(() => {
+          copyWhatsappBtnText.textContent = "Copia elenco per WhatsApp";
+        }, 3000);
+      } catch (err) {
+        console.error("Errore copia negli appunti:", err);
+      } finally {
+        document.body.removeChild(tempTextArea);
+      }
+    });
+
+    resetAllTriggerBtn.addEventListener('click', () => {
+      resetAllConfirmBox.classList.remove('hidden');
+    });
+
+    cancelResetAllBtn.addEventListener('click', () => {
+      resetAllConfirmBox.classList.add('hidden');
+    });
+
+    confirmResetAllBtn.addEventListener('click', async () => {
+      confirmResetAllBtn.disabled = true;
+      confirmResetAllBtn.textContent = "Azzeramento...";
+
+      try {
+        if (firestoreReady && firestoreDb && firestoreOps) {
+          const batch = firestoreOps.writeBatch(firestoreDb);
+          TIME_SLOTS.forEach((slot) => {
+            if (bookingsMap[slot.id]) {
+              const ref = firestoreOps.doc(
+                firestoreDb,
+                "artifacts",
+                firestoreAppId,
+                "public",
+                "data",
+                "appointments",
+                slot.id
+              );
+              batch.delete(ref);
+            }
+          });
+          await batch.commit();
+        }
+
+        bookingsMap = {};
+        saveLocalBookings(bookingsMap, true);
+        renderAllUI();
+        resetAllConfirmBox.classList.add('hidden');
+      } catch (error) {
+        console.error("Errore reset totale:", error);
+      } finally {
+        confirmResetAllBtn.disabled = false;
+        confirmResetAllBtn.textContent = "Sì, azzera tutto";
+      }
+    });
+
+    // Avvio immediato senza attese bloccanti
+    initImmediateApp();
+  </script>
+</body>
+</html>
