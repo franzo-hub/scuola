@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Incontro scuola-famiglia 02.12.26</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Inter ad alta leggibilità -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col justify-between antialiased">
+
+  <!-- ===================================================================== -->
+  <!-- INTESTAZIONE PRINCIPALE                                               -->
+  <!-- ===================================================================== -->
+  <header class="bg-emerald-700 text-white shadow-md sticky top-0 z-20">
+    <div class="max-w-lg mx-auto px-4 py-4">
+      <div class="flex items-center justify-between gap-2">
+        <div>
+          <span class="inline-block text-xs font-semibold uppercase tracking-wider bg-emerald-800/80 text-emerald-100 px-2.5 py-0.5 rounded-full mb-1">
+            Prenotazione turno
+          </span>
+          <h1 class="text-xl sm:text-2xl font-extrabold leading-tight">
+            Incontro scuola-famiglia 02.12.26
+          </h1>
+        </div>
+        <div id="connectionBadge" class="shrink-0 flex items-center gap-1.5 text-xs font-semibold bg-emerald-800/90 px-2.5 py-1.5 rounded-full">
+          <span id="connectionDot" class="w-2 h-2 rounded-full bg-amber-300 animate-pulse"></span>
+          <span id="connectionText">Connessione...</span>
+        </div>
+      </div>
+      <p class="text-emerald-100 text-sm mt-1">
+        Colloqui da 7 minuti • Dalle <strong>17:15</strong> alle <strong>20:03</strong>
+      </p>
+    </div>
+  </header>
+
+  <!-- ===================================================================== -->
+  <!-- CONTENUTO PRINCIPALE                                                  -->
+  <!-- ===================================================================== -->
+  <main class="max-w-lg w-full mx-auto px-4 py-5 flex-1 space-y-5">
+
+    <!-- Box Istruzioni Semplici -->
+    <section class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+      <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+        <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 text-sm font-extrabold">i</span>
+        Come prenotare in 2 secondi
+      </h2>
+      <ol class="mt-2 text-sm text-slate-700 space-y-1.5 list-decimal list-inside leading-relaxed">
+        <li>Tocca un orario <span class="font-bold text-emerald-700">LIBERO</span> (verde).</li>
+        <li><strong>Inserisci il nome del bambino/a</strong> e conferma.</li>
+        <li>È possibile scegliere <strong>un solo orario</strong> a famiglia.</li>
+      </ol>
+    </section>
+
+    <!-- Banner di stato / avvisi / errori -->
+    <div id="statusBanner" class="hidden rounded-2xl p-4 text-sm font-medium border shadow-sm" role="alert"></div>
+
+    <!-- Riepilogo Personale della Propria Prenotazione -->
+    <section id="myBookingCard" class="hidden bg-emerald-50 border-2 border-emerald-600 rounded-2xl p-4 shadow-sm">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <span class="inline-block text-xs font-bold uppercase tracking-wider text-emerald-800 bg-emerald-200/80 px-2.5 py-0.5 rounded-full">
+            Il tuo appuntamento confermato
+          </span>
+          <p id="myBookingTime" class="text-2xl font-extrabold text-emerald-950 mt-1">
+            Ore --:--
+          </p>
+          <p class="text-sm text-emerald-900 mt-0.5">
+            Bambino/a: <strong id="myBookingName">—</strong>
+          </p>
+        </div>
+        <button
+          id="cancelMyBookingBtn"
+          type="button"
+          class="shrink-0 bg-white hover:bg-red-50 active:bg-red-100 text-red-700 border border-red-300 font-bold text-sm px-3.5 py-2.5 rounded-xl shadow-sm transition"
+        >
+          Annulla / Cambia
+        </button>
+      </div>
+      <p class="text-xs text-emerald-800 mt-2.5">
+        Per scegliere un altro orario, tocca prima <strong>Annulla / Cambia</strong>.
+      </p>
+    </section>
+
+    <!-- Contatore posti disponibili -->
+    <div class="flex items-center justify-between px-1">
+      <h2 class="text-base font-bold text-slate-800">
+        Scegli un orario
+      </h2>
+      <span id="freeCountBadge" class="text-xs font-bold bg-slate-200 text-slate-800 px-3 py-1 rounded-full">
+        25 / 25 liberi
+      </span>
+    </div>
+
+    <!-- Indicatore caricamento iniziale -->
+    <div id="loadingIndicator" class="bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm">
+      <div class="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+      <p class="text-sm font-medium text-slate-600 mt-3">Sincronizzazione orari in corso...</p>
+    </div>
+
+    <!-- Elenco dei 25 Slot Orari -->
+    <section id="slotsGrid" class="space-y-2.5" aria-label="Elenco fasce orarie">
+      <!-- Popolato dinamicamente via JavaScript -->
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- AREA RISERVATA ORGANIZZATORE (PIN 251125)                           -->
+    <!-- =================================================================== -->
+    <section class="pt-6 border-t border-slate-200">
+      <button
+        id="toggleAdminSectionBtn"
+        type="button"
+        class="w-full flex items-center justify-between text-left bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-semibold text-sm px-4 py-3 rounded-2xl transition"
+      >
+        <span>🔒 Area Organizzatore</span>
+        <span id="adminChevron" class="text-xs font-bold">▼</span>
+      </button>
+
+      <div id="adminPanel" class="hidden mt-3 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
+        <!-- Accesso tramite PIN -->
+        <div id="adminPinGate" class="space-y-3">
+          <p class="text-sm text-slate-700 font-medium">
+            Inserisci il PIN organizzatore per gestire le prenotazioni o copiare l'elenco per WhatsApp.
+          </p>
+          <div class="flex gap-2">
+            <input
+              id="adminPinInput"
+              type="password"
+              inputmode="numeric"
+              maxlength="10"
+              placeholder="PIN"
+              class="flex-1 border border-slate-300 rounded-xl px-3.5 py-2.5 text-base font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            />
+            <button
+              id="adminUnlockBtn"
+              type="button"
+              class="bg-slate-800 hover:bg-slate-900 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition"
+            >
+              Entra
+            </button>
+          </div>
+          <p id="adminPinError" class="hidden text-xs font-semibold text-red-600">
+            PIN non corretto. Riprova.
+          </p>
+        </div>
+
+        <!-- Pannello Organizzatore Sbloccato -->
+        <div id="adminDashboard" class="hidden space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200">
+            <div class="text-sm">
+              <span class="font-bold text-slate-800">Prenotati:</span>
+              <span id="adminBookedCount" class="font-extrabold text-emerald-700">0</span>
+              <span class="text-slate-400 mx-1">•</span>
+              <span class="font-bold text-slate-800">Liberi:</span>
+              <span id="adminFreeCount" class="font-extrabold text-slate-700">25</span>
+            </div>
+            <button
+              id="lockAdminBtn"
+              type="button"
+              class="text-xs font-semibold text-slate-500 hover:text-slate-800 underline"
+            >
+              Chiudi area
+            </button>
+          </div>
+
+          <!-- Azioni Rapide Organizzatore -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <button
+              id="copySummaryBtn"
+              type="button"
+              class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm py-3 px-4 rounded-xl shadow-sm transition flex items-center justify-center gap-2"
+            >
+              <span>📋 Copia elenco per WhatsApp</span>
+            </button>
+            <button
+              id="resetAllBtn"
+              type="button"
+              class="w-full bg-red-50 hover:bg-red-100 text-red-700 border border-red-300 font-bold text-sm py-3 px-4 rounded-xl transition flex items-center justify-center gap-2"
+            >
+              <span>🗑️ Azzera tutto</span>
+            </button>
+          </div>
+
+          <!-- Tabella Riepilogativa con pulsante Libera -->
+          <div class="space-y-2 max-h-96 overflow-y-auto pr-1" id="adminBookingsList">
+            <!-- Popolato dinamicamente -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- FOOTER                                                                -->
+  <!-- ===================================================================== -->
+  <footer class="max-w-lg w-full mx-auto px-4 py-6 text-center text-xs text-slate-400">
+    Incontro scuola-famiglia 02.12.26 • Aggiornamento in tempo reale
+  </footer>
+
+  <!-- ===================================================================== -->
+  <!-- MODALE DI PRENOTAZIONE (INSERIMENTO NOME BAMBINO/A)                   -->
+  <!-- ===================================================================== -->
+  <div
+    id="bookingModal"
+    class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs items-end sm:items-center justify-center p-4"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="modalTitle"
+  >
+    <div class="bg-white w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl border border-slate-200">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-extrabold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full">
+          Conferma orario
+        </span>
+        <button
+          id="closeModalBtn"
+          type="button"
+          class="text-slate-400 hover:text-slate-700 text-xl font-bold px-2 py-1 rounded-lg"
+          aria-label="Chiudi"
+        >
+          ✕
+        </button>
+      </div>
+
+      <h3 id="modalTitle" class="text-2xl font-extrabold text-slate-900 mt-3">
+        Ore <span id="modalSlotTime" class="text-emerald-700">--:--</span>
+      </h3>
+      <p class="text-sm text-slate-600 mt-1">
+        Durata colloquio: 7 minuti.
+      </p>
+
+      <form id="bookingForm" class="mt-4 space-y-4">
+        <div>
+          <label for="userNameInput" class="block text-sm font-bold text-slate-800 mb-1.5">
+            Inserisci il nome del bambino/a
+          </label>
+          <input
+            id="userNameInput"
+            type="text"
+            required
+            maxlength="60"
+            autocomplete="off"
+            placeholder="Es. Marco Rossi"
+            class="w-full border-2 border-slate-300 focus:border-emerald-600 rounded-2xl px-4 py-3.5 text-lg font-semibold text-slate-900 focus:outline-none"
+          />
+          <p id="inputErrorText" class="hidden text-xs font-semibold text-red-600 mt-1.5">
+            Per favore, inserisci il nome del bambino/a (almeno 2 caratteri).
+          </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 pt-1">
+          <button
+            type="button"
+            id="cancelModalSecondaryBtn"
+            class="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-base py-3.5 rounded-2xl transition"
+          >
+            Annulla
+          </button>
+          <button
+            id="confirmBookingBtn"
+            type="submit"
+            class="w-full bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-extrabold text-base py-3.5 rounded-2xl shadow-md transition"
+          >
+            Conferma
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODALE DI CONFERMA PERSONALIZZATO (NO alert / NO confirm)             -->
+  <!-- ===================================================================== -->
+  <div
+    id="confirmModal"
+    class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs items-center justify-center p-4"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div class="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl border border-slate-200 space-y-4">
+      <h3 id="confirmTitle" class="text-lg font-extrabold text-slate-900">
+        Conferma operazione
+      </h3>
+      <p id="confirmMessage" class="text-sm text-slate-700 leading-relaxed">
+        Sei sicuro di voler procedere?
+      </p>
+      <div class="grid grid-cols-2 gap-3 pt-1">
+        <button
+          id="confirmCancelBtn"
+          type="button"
+          class="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm py-3 rounded-xl transition"
+        >
+          No, torna indietro
+        </button>
+        <button
+          id="confirmProceedBtn"
+          type="button"
+          class="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-sm py-3 rounded-xl shadow-sm transition"
+        >
+          Sì, procedi
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- LOGICA APPLICATIVA & FIREBASE REALTIME DATABASE                       -->
+  <!-- ===================================================================== -->
+  <script type="module">
+    // =========================================================================
+    // 1. CONFIGURAZIONE DATABASE & EVENTO
+    // =========================================================================
+    const REALTIME_DB_URL = "https://franzo-hub-scuola-default-rtdb.europe-west1.firebasedatabase.app";
+    const EVENT_PATH = "artifacts/incontro-scuola-famiglia-021226/public/data/appointments";
+
+    const EVENT_TITLE = "Incontro scuola-famiglia 02.12.26";
+    const ADMIN_PIN = "251125";
+    const TOTAL_SLOTS = 25;
+    const START_HOUR = 17;
+    const START_MINUTE = 15;
+    const INTERVAL_MINUTES = 7;
+
+    // SDK Firebase v10 modulare via CDN ufficiale
+    const FIREBASE_SDK_VERSION = "10.14.1";
+    const FIREBASE_SDK_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}`;
+
+    // =========================================================================
+    // 2. GENERAZIONE DEI 25 ORARI (17:15 -> 20:03, INTERVALLI DI 7 MINUTI)
+    // =========================================================================
+    function generateSlots() {
+      const slots = [];
+      let totalMinutes = START_HOUR * 60 + START_MINUTE;
+      for (let i = 0; i < TOTAL_SLOTS; i++) {
+        const hh = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+        const mm = String(totalMinutes % 60).padStart(2, "0");
+        const timeStr = `${hh}:${mm}`;
+        slots.push({
+          id: `slot_${String(i).padStart(2, "0")}_${hh}${mm}`,
+          index: i,
+          time: timeStr
+        });
+        totalMinutes += INTERVAL_MINUTES;
+      }
+      return slots;
+    }
+
+    const SLOTS = generateSlots();
+
+    // Identificativo univoco persistente del browser/dispositivo per riconoscere il proprio turno
+    function getOrCreateClientId() {
+      const storageKey = "franzo_scuola_client_uid_021226";
+      try {
+        let uid = localStorage.getItem(storageKey);
+        if (!uid) {
+          uid = (typeof crypto !== "undefined" && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : `user_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+          localStorage.setItem(storageKey, uid);
+        }
+        return uid;
+      } catch (e) {
+        return `user_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      }
+    }
+
+    // Stato globale applicazione
+    const currentUserId = getOrCreateClientId();
+    let bookingsMap = {}; // { slotId: { name, userId, time, createdAt } }
+    let selectedSlotToBook = null;
+    let isAdminUnlocked = false;
+    let isFirebaseConnected = false;
+    let useLocalFallback = false;
+    let db = null;
+    let rtdbOps = null;
+
+    const LOCAL_STORAGE_BOOKINGS_KEY = "franzo_scuola_bookings_fallback_021226";
+    const broadcastChannel = (typeof BroadcastChannel !== "undefined")
+      ? new BroadcastChannel("franzo_scuola_sync_021226")
+      : null;
+
+    // Riferimenti DOM
+    const connectionDot = document.getElementById("connectionDot");
+    const connectionText = document.getElementById("connectionText");
+    const loadingIndicator = document.getElementById("loadingIndicator");
+    const statusBanner = document.getElementById("statusBanner");
+    const freeCountBadge = document.getElementById("freeCountBadge");
+    const myBookingCard = document.getElementById("myBookingCard");
+    const myBookingTime = document.getElementById("myBookingTime");
+    const myBookingName = document.getElementById("myBookingName");
+    const cancelMyBookingBtn = document.getElementById("cancelMyBookingBtn");
+    const slotsGrid = document.getElementById("slotsGrid");
+
+    const bookingModal = document.getElementById("bookingModal");
+    const modalSlotTime = document.getElementById("modalSlotTime");
+    const bookingForm = document.getElementById("bookingForm");
+    const userNameInput = document.getElementById("userNameInput");
+    const inputErrorText = document.getElementById("inputErrorText");
+    const closeModalBtn = document.getElementById("closeModalBtn");
+    const cancelModalSecondaryBtn = document.getElementById("cancelModalSecondaryBtn");
+    const confirmBookingBtn = document.getElementById("confirmBookingBtn");
+
+    const confirmModal = document.getElementById("confirmModal");
+    const confirmTitle = document.getElementById("confirmTitle");
+    const confirmMessage = document.getElementById("confirmMessage");
+    const confirmCancelBtn = document.getElementById("confirmCancelBtn");
+    const confirmProceedBtn = document.getElementById("confirmProceedBtn");
+    let pendingConfirmCallback = null;
+
+    const toggleAdminSectionBtn = document.getElementById("toggleAdminSectionBtn");
+    const adminChevron = document.getElementById("adminChevron");
+    const adminPanel = document.getElementById("adminPanel");
+    const adminPinGate = document.getElementById("adminPinGate");
+    const adminPinInput = document.getElementById("adminPinInput");
+    const adminUnlockBtn = document.getElementById("adminUnlockBtn");
+    const adminPinError = document.getElementById("adminPinError");
+    const adminDashboard = document.getElementById("adminDashboard");
+    const adminBookedCount = document.getElementById("adminBookedCount");
+    const adminFreeCount = document.getElementById("adminFreeCount");
+    const adminBookingsList = document.getElementById("adminBookingsList");
+    const copySummaryBtn = document.getElementById("copySummaryBtn");
+    const resetAllBtn = document.getElementById("resetAllBtn");
+    const lockAdminBtn = document.getElementById("lockAdminBtn");
+
+    // =========================================================================
+    // 3. NOTIFICHE, STATO CONNESSIONE E FINESTRA DI CONFERMA
+    // =========================================================================
+    function updateConnectionBadge(state) {
+      connectionDot.classList.remove("bg-amber-300", "bg-emerald-300", "bg-red-400", "animate-pulse");
+      if (state === "online") {
+        connectionDot.classList.add("bg-emerald-300");
+        connectionText.textContent = "Live";
+      } else if (state === "offline") {
+        connectionDot.classList.add("bg-amber-300");
+        connectionText.textContent = "Locale";
+      } else {
+        connectionDot.classList.add("bg-amber-300", "animate-pulse");
+        connectionText.textContent = "Connessione...";
+      }
+    }
+
+    let bannerTimeout = null;
+    function showBanner(message, type = "info") {
+      clearTimeout(bannerTimeout);
+      statusBanner.classList.remove(
+        "hidden",
+        "bg-emerald-50", "text-emerald-900", "border-emerald-300",
+        "bg-red-50", "text-red-900", "border-red-300",
+        "bg-amber-50", "text-amber-900", "border-amber-300"
+      );
+
+      if (type === "success") {
+        statusBanner.classList.add("bg-emerald-50", "text-emerald-900", "border-emerald-300");
+      } else if (type === "error") {
+        statusBanner.classList.add("bg-red-50", "text-red-900", "border-red-300");
+      } else {
+        statusBanner.classList.add("bg-amber-50", "text-amber-900", "border-amber-300");
+      }
+
+      statusBanner.textContent = message;
+      bannerTimeout = setTimeout(() => {
+        statusBanner.classList.add("hidden");
+      }, 7000);
+    }
+
+    function openConfirmDialog(title, message, onConfirm) {
+      confirmTitle.textContent = title;
+      confirmMessage.textContent = message;
+      pendingConfirmCallback = onConfirm;
+      confirmModal.classList.remove("hidden");
+      confirmModal.classList.add("flex");
+    }
+
+    function closeConfirmDialog() {
+      confirmModal.classList.add("hidden");
+      confirmModal.classList.remove("flex");
+      pendingConfirmCallback = null;
+    }
+
+    confirmCancelBtn.addEventListener("click", closeConfirmDialog);
+    confirmProceedBtn.addEventListener("click", async () => {
+      const cb = pendingConfirmCallback;
+      closeConfirmDialog();
+      if (typeof cb === "function") {
+        await cb();
+      }
+    });
+
+    // =========================================================================
+    // 4. FALLBACK LOCALE DI SICUREZZA (SE RETE O REGOLE FIREBASE BLOCCATE)
+    // =========================================================================
+    function loadLocalBookings() {
+      try {
+        const raw = localStorage.getItem(LOCAL_STORAGE_BOOKINGS_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        return (parsed && typeof parsed === "object") ? parsed : {};
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function saveLocalBookings(nextMap) {
+      bookingsMap = nextMap;
+      try {
+        localStorage.setItem(LOCAL_STORAGE_BOOKINGS_KEY, JSON.stringify(nextMap));
+      } catch (e) {}
+      if (broadcastChannel) {
+        try {
+          broadcastChannel.postMessage({ type: "sync", data: nextMap });
+        } catch (e) {}
+      }
+      renderAllUI();
+    }
+
+    function activateLocalFallback(reasonMessage) {
+      if (!useLocalFallback) {
+        useLocalFallback = true;
+        bookingsMap = loadLocalBookings();
+        updateConnectionBadge("offline");
+        loadingIndicator.classList.add("hidden");
+        renderAllUI();
+        if (reasonMessage) {
+          showBanner(reasonMessage, "info");
+        }
+      }
+    }
+
+    if (broadcastChannel) {
+      broadcastChannel.onmessage = (event) => {
+        if (useLocalFallback && event.data && event.data.type === "sync") {
+          bookingsMap = event.data.data || {};
+          renderAllUI();
+        }
+      };
+    }
+
+    // =========================================================================
+    // 5. RENDERING INTERFACCIA UTENTE E DASHBOARD ORGANIZZATORE
+    // =========================================================================
+    function getMyBooking() {
+      if (!currentUserId) return null;
+      for (const slot of SLOTS) {
+        const b = bookingsMap[slot.id];
+        if (b && b.userId === currentUserId) {
+          return { slot, booking: b };
+        }
+      }
+      return null;
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function renderAllUI() {
+      const bookedCount = SLOTS.filter((s) => Boolean(bookingsMap[s.id])).length;
+      const freeCount = TOTAL_SLOTS - bookedCount;
+      freeCountBadge.textContent = `${freeCount} / ${TOTAL_SLOTS} liberi`;
+
+      const myBooking = getMyBooking();
+      if (myBooking) {
+        myBookingCard.classList.remove("hidden");
+        myBookingTime.textContent = `Ore ${myBooking.slot.time}`;
+        myBookingName.textContent = myBooking.booking.name;
+      } else {
+        myBookingCard.classList.add("hidden");
+      }
+
+      slotsGrid.innerHTML = "";
+      SLOTS.forEach((slot) => {
+        const booking = bookingsMap[slot.id];
+        const isMine = booking && currentUserId && booking.userId === currentUserId;
+        const isTaken = Boolean(booking);
+
+        const cardBtn = document.createElement("button");
+        cardBtn.type = "button";
+        cardBtn.className = [
+          "w-full text-left p-4 rounded-2xl border-2 transition flex items-center justify-between gap-3 shadow-sm",
+          isMine
+            ? "bg-emerald-50 border-emerald-600 cursor-default"
+            : isTaken
+              ? "bg-slate-100 border-slate-200 cursor-not-allowed opacity-90"
+              : "bg-white border-slate-200 hover:border-emerald-500 active:scale-[0.99] cursor-pointer"
+        ].join(" ");
+
+        const leftCol = document.createElement("div");
+        leftCol.className = "flex items-center gap-3 min-w-0";
+
+        const timeBadge = document.createElement("span");
+        timeBadge.className = [
+          "text-xl font-extrabold px-3 py-1.5 rounded-xl shrink-0",
+          isMine
+            ? "bg-emerald-700 text-white"
+            : isTaken
+              ? "bg-slate-300 text-slate-700"
+              : "bg-emerald-100 text-emerald-900"
+        ].join(" ");
+        timeBadge.textContent = slot.time;
+
+        const infoCol = document.createElement("div");
+        infoCol.className = "min-w-0";
+
+        const statusLine = document.createElement("p");
+        statusLine.className = [
+          "text-base font-bold truncate",
+          isMine ? "text-emerald-900" : isTaken ? "text-slate-700" : "text-slate-900"
+        ].join(" ");
+
+        if (isMine) {
+          statusLine.textContent = `${booking.name} (Il tuo turno)`;
+        } else if (isTaken) {
+          statusLine.textContent = booking.name;
+        } else {
+          statusLine.textContent = "Disponibile";
+        }
+
+        const subLine = document.createElement("p");
+        subLine.className = "text-xs font-medium text-slate-500";
+        subLine.textContent = isMine
+          ? "Prenotato da te"
+          : isTaken
+            ? "Orario già prenotato"
+            : "Tocca per prenotare";
+
+        infoCol.appendChild(statusLine);
+        infoCol.appendChild(subLine);
+        leftCol.appendChild(timeBadge);
+        leftCol.appendChild(infoCol);
+
+        const rightBadge = document.createElement("span");
+        rightBadge.className = [
+          "text-xs font-extrabold uppercase tracking-wider px-3 py-1.5 rounded-full shrink-0",
+          isMine
+            ? "bg-emerald-700 text-white"
+            : isTaken
+              ? "bg-red-100 text-red-700"
+              : "bg-emerald-100 text-emerald-800"
+        ].join(" ");
+        rightBadge.textContent = isMine ? "TUO" : isTaken ? "OCCUPATO" : "LIBERO";
+
+        cardBtn.appendChild(leftCol);
+        cardBtn.appendChild(rightBadge);
+
+        if (!isTaken) {
+          cardBtn.addEventListener("click", () => handleSlotClick(slot));
+        } else {
+          cardBtn.disabled = true;
+        }
+
+        slotsGrid.appendChild(cardBtn);
+      });
+
+      if (isAdminUnlocked) {
+        renderAdminDashboard(bookedCount, freeCount);
+      }
+    }
+
+    function renderAdminDashboard(bookedCount, freeCount) {
+      adminBookedCount.textContent = String(bookedCount);
+      adminFreeCount.textContent = String(freeCount);
+      adminBookingsList.innerHTML = "";
+
+      SLOTS.forEach((slot) => {
+        const booking = bookingsMap[slot.id];
+        const row = document.createElement("div");
+        row.className = "flex items-center justify-between gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50";
+
+        const info = document.createElement("div");
+        info.className = "min-w-0";
+        info.innerHTML = `<span class="font-bold text-slate-900 mr-2">${slot.time}</span>` +
+          (booking
+            ? `<span class="text-slate-800 font-medium break-words">${escapeHtml(booking.name)}</span>`
+            : `<span class="text-slate-400 italic">Libero</span>`);
+
+        row.appendChild(info);
+
+        if (booking) {
+          const delBtn = document.createElement("button");
+          delBtn.type = "button";
+          delBtn.className = "text-xs font-bold text-red-700 bg-red-100 hover:bg-red-200 px-2.5 py-1.5 rounded-lg shrink-0 transition";
+          delBtn.textContent = "Libera";
+          delBtn.addEventListener("click", () => {
+            openConfirmDialog(
+              `Liberare le ${slot.time}?`,
+              `Vuoi rimuovere la prenotazione di "${booking.name}" per le ore ${slot.time}?`,
+              () => deleteSlotBooking(slot.id)
+            );
+          });
+          row.appendChild(delBtn);
+        }
+
+        adminBookingsList.appendChild(row);
+      });
+    }
+
+    // =========================================================================
+    // 6. CONNESSIONE REALTIME A FIREBASE REALTIME DATABASE
+    // =========================================================================
+    async function initFirebaseRealtime() {
+      let settled = false;
+
+      // Timeout di sicurezza se la rete/sandbox blocca il collegamento
+      const connectionTimeout = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          activateLocalFallback(
+            "Connessione al database lenta o bloccata in questo ambiente. Attiva la modalità locale di sicurezza."
+          );
+        }
+      }, 6500);
+
+      try {
+        const [appMod, dbMod] = await Promise.all([
+          import(`${FIREBASE_SDK_BASE}/firebase-app.js`),
+          import(`${FIREBASE_SDK_BASE}/firebase-database.js`)
+        ]);
+
+        const app = appMod.initializeApp({
+          databaseURL: REALTIME_DB_URL
+        });
+
+        db = dbMod.getDatabase(app);
+        rtdbOps = dbMod;
+
+        // Monitoraggio stato connessione effettivo verso Firebase RTDB (.info/connected)
+        const connectedRef = dbMod.ref(db, ".info/connected");
+        dbMod.onValue(connectedRef, (snap) => {
+          if (snap.val() === true) {
+            isFirebaseConnected = true;
+            useLocalFallback = false;
+            updateConnectionBadge("online");
+          } else if (isFirebaseConnected) {
+            updateConnectionBadge("connecting");
+          }
+        });
+
+        // Ascolto in tempo reale di tutti i 25 appuntamenti
+        const appointmentsRef = dbMod.ref(db, EVENT_PATH);
+        dbMod.onValue(
+          appointmentsRef,
+          (snapshot) => {
+            clearTimeout(connectionTimeout);
+            settled = true;
+            isFirebaseConnected = true;
+            useLocalFallback = false;
+            const val = snapshot.val();
+            bookingsMap = (val && typeof val === "object") ? val : {};
+            loadingIndicator.classList.add("hidden");
+            updateConnectionBadge("online");
+            renderAllUI();
+          },
+          (error) => {
+            console.error("Errore lettura Firebase Realtime Database:", error);
+            clearTimeout(connectionTimeout);
+            settled = true;
+            activateLocalFallback(
+              "Impossibile leggere dal database Firebase (controlla connessione o regole di sicurezza). Attiva modalità locale."
+            );
+          }
+        );
+      } catch (err) {
+        console.error("Errore inizializzazione SDK Firebase:", err);
+        clearTimeout(connectionTimeout);
+        settled = true;
+        activateLocalFallback(
+          "Impossibile caricare il servizio di sincronizzazione online. Attiva modalità locale."
+        );
+      }
+    }
+
+    // =========================================================================
+    // 7. PRENOTAZIONE CON TRANSAZIONE ATOMICA (ANTI DOPPIA PRENOTAZIONE)
+    // =========================================================================
+    function handleSlotClick(slot) {
+      if (!isFirebaseConnected && !useLocalFallback) {
+        showBanner("Attendi il completamento della connessione prima di prenotare.", "info");
+        return;
+      }
+
+      const existing = getMyBooking();
+      if (existing) {
+        showBanner(
+          `Hai già prenotato le ore ${existing.slot.time} (${existing.booking.name}). Annulla prima quello se vuoi cambiare orario.`,
+          "info"
+        );
+        myBookingCard.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+
+      selectedSlotToBook = slot;
+      modalSlotTime.textContent = slot.time;
+      userNameInput.value = "";
+      inputErrorText.classList.add("hidden");
+      bookingModal.classList.remove("hidden");
+      bookingModal.classList.add("flex");
+      setTimeout(() => userNameInput.focus(), 80);
+    }
+
+    function closeBookingModal() {
+      bookingModal.classList.add("hidden");
+      bookingModal.classList.remove("flex");
+      selectedSlotToBook = null;
+    }
+
+    closeModalBtn.addEventListener("click", closeBookingModal);
+    cancelModalSecondaryBtn.addEventListener("click", closeBookingModal);
+    bookingModal.addEventListener("click", (e) => {
+      if (e.target === bookingModal) closeBookingModal();
+    });
+
+    bookingForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!selectedSlotToBook) return;
+
+      const rawName = userNameInput.value.trim().replace(/\s+/g, " ");
+      if (rawName.length < 2) {
+        inputErrorText.classList.remove("hidden");
+        userNameInput.focus();
+        return;
+      }
+      inputErrorText.classList.add("hidden");
+
+      const existing = getMyBooking();
+      if (existing) {
+        closeBookingModal();
+        showBanner(`Hai già una prenotazione attiva alle ${existing.slot.time}.`, "info");
+        return;
+      }
+
+      confirmBookingBtn.disabled = true;
+      confirmBookingBtn.textContent = "Salvataggio...";
+      const slotToSave = selectedSlotToBook;
+
+      // Modalità fallback locale
+      if (useLocalFallback || !db || !rtdbOps) {
+        const latestMap = loadLocalBookings();
+        if (latestMap[slotToSave.id]) {
+          closeBookingModal();
+          confirmBookingBtn.disabled = false;
+          confirmBookingBtn.textContent = "Conferma";
+          showBanner("Questo orario è già stato prenotato.", "error");
+          return;
+        }
+        latestMap[slotToSave.id] = {
+          name: rawName,
+          userId: currentUserId,
+          time: slotToSave.time,
+          createdAt: Date.now()
+        };
+        saveLocalBookings(latestMap);
+        closeBookingModal();
+        confirmBookingBtn.disabled = false;
+        confirmBookingBtn.textContent = "Conferma";
+        showBanner(`Appuntamento confermato per ${rawName} alle ore ${slotToSave.time}.`, "success");
+        return;
+      }
+
+      // Transazione atomica su Firebase Realtime Database per prevenire sovrapposizioni simultanee
+      const slotRef = rtdbOps.ref(db, `${EVENT_PATH}/${slotToSave.id}`);
+      try {
+        const result = await rtdbOps.runTransaction(slotRef, (currentData) => {
+          if (currentData !== null) {
+            // Qualcun altro ha appena prenotato questo slot: interrompi transazione
+            return;
+          }
+          return {
+            name: rawName,
+            userId: currentUserId,
+            time: slotToSave.time,
+            createdAt: Date.now()
+          };
+        });
+
+        closeBookingModal();
+        if (result.committed) {
+          showBanner(`Perfetto! Appuntamento confermato per ${rawName} alle ore ${slotToSave.time}.`, "success");
+        } else {
+          showBanner("Qualcuno ha appena prenotato questo orario un istante fa. Scegline un altro libero.", "error");
+        }
+      } catch (err) {
+        console.error("Errore transazione Firebase:", err);
+        showBanner("Errore di rete o permessi durante la prenotazione. Riprova tra un attimo.", "error");
+      } finally {
+        confirmBookingBtn.disabled = false;
+        confirmBookingBtn.textContent = "Conferma";
+      }
+    });
+
+    cancelMyBookingBtn.addEventListener("click", () => {
+      const myBooking = getMyBooking();
+      if (!myBooking) return;
+
+      openConfirmDialog(
+        "Annullare il tuo appuntamento?",
+        `Vuoi liberare l'orario delle ${myBooking.slot.time} prenotato per "${myBooking.booking.name}"?`,
+        () => deleteSlotBooking(myBooking.slot.id, true)
+      );
+    });
+
+    async function deleteSlotBooking(slotId, isSelfCancel = false) {
+      if (useLocalFallback || !db || !rtdbOps) {
+        const latestMap = loadLocalBookings();
+        delete latestMap[slotId];
+        saveLocalBookings(latestMap);
+        showBanner(
+          isSelfCancel
+            ? "La tua prenotazione è stata annullata. Ora puoi scegliere un altro orario."
+            : "Orario liberato con successo.",
+          "success"
+        );
+        return;
+      }
+
+      try {
+        const slotRef = rtdbOps.ref(db, `${EVENT_PATH}/${slotId}`);
+        await rtdbOps.remove(slotRef);
+        showBanner(
+          isSelfCancel
+            ? "La tua prenotazione è stata annullata. Ora puoi scegliere un altro orario."
+            : "Orario liberato con successo.",
+          "success"
+        );
+      } catch (err) {
+        console.error("Errore cancellazione slot:", err);
+        showBanner("Impossibile cancellare la prenotazione. Controlla la connessione e riprova.", "error");
+      }
+    }
+
+    // =========================================================================
+    // 8. AREA ORGANIZZATORE (PIN 251125, COPIA WHATSAPP, RESET COMPLETO)
+    // =========================================================================
+    toggleAdminSectionBtn.addEventListener("click", () => {
+      const isHidden = adminPanel.classList.contains("hidden");
+      adminPanel.classList.toggle("hidden", !isHidden);
+      adminChevron.textContent = isHidden ? "▲" : "▼";
+    });
+
+    function tryUnlockAdmin() {
+      const entered = adminPinInput.value.trim();
+      if (entered === ADMIN_PIN) {
+        isAdminUnlocked = true;
+        adminPinError.classList.add("hidden");
+        adminPinGate.classList.add("hidden");
+        adminDashboard.classList.remove("hidden");
+        adminPinInput.value = "";
+        renderAllUI();
+      } else {
+        adminPinError.classList.remove("hidden");
+        adminPinInput.focus();
+      }
+    }
+
+    adminUnlockBtn.addEventListener("click", tryUnlockAdmin);
+    adminPinInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        tryUnlockAdmin();
+      }
+    });
+
+    lockAdminBtn.addEventListener("click", () => {
+      isAdminUnlocked = false;
+      adminDashboard.classList.add("hidden");
+      adminPinGate.classList.remove("hidden");
+    });
+
+    copySummaryBtn.addEventListener("click", () => {
+      const lines = [`📅 *${EVENT_TITLE}*`, ""];
+      SLOTS.forEach((slot) => {
+        const b = bookingsMap[slot.id];
+        lines.push(`• *${slot.time}* — ${b ? b.name : "_Libero_"}`);
+      });
+      const textToCopy = lines.join("\n");
+
+      const tempArea = document.createElement("textarea");
+      tempArea.value = textToCopy;
+      tempArea.style.position = "fixed";
+      tempArea.style.opacity = "0";
+      document.body.appendChild(tempArea);
+      tempArea.select();
+      try {
+        document.execCommand("copy");
+        showBanner("Elenco copiato! Ora puoi incollarlo direttamente nella chat WhatsApp.", "success");
+      } catch (err) {
+        showBanner("Impossibile copiare automaticamente l'elenco.", "error");
+      }
+      document.body.removeChild(tempArea);
+    });
+
+    resetAllBtn.addEventListener("click", () => {
+      openConfirmDialog(
+        "Azzerare TUTTE le prenotazioni?",
+        "Attenzione: tutti i 25 orari torneranno liberi e i nomi inseriti verranno cancellati definitivamente.",
+        async () => {
+          if (useLocalFallback || !db || !rtdbOps) {
+            saveLocalBookings({});
+            showBanner("Tutti i 25 appuntamenti sono stati azzerati.", "success");
+            return;
+          }
+
+          try {
+            const rootRef = rtdbOps.ref(db, EVENT_PATH);
+            await rtdbOps.remove(rootRef);
+            showBanner("Tutti i 25 appuntamenti sono stati azzerati.", "success");
+          } catch (err) {
+            console.error("Errore reset totale:", err);
+            showBanner("Errore durante l'azzeramento delle prenotazioni. Riprova.", "error");
+          }
+        }
+      );
+    });
+
+    // =========================================================================
+    // 9. AVVIO APPLICAZIONE
+    // =========================================================================
+    renderAllUI();
+    initFirebaseRealtime();
+  </script>
+</body>
+</html>
