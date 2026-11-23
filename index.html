@@ -1,0 +1,613 @@
+<!-- ... existing code ... -->
+  <!-- LOGICA APPLICATIVA & FIREBASE REALTIME DATABASE IN TEMPO REALE        -->
+  <!-- ===================================================================== -->
+  <script type="module">
+    // =========================================================================
+    // 0. COLLEGAMENTO DIRETTO AL TUO FIREBASE REALTIME DATABASE
+    // =========================================================================
+    const REALTIME_DB_URL = "https://franzo-hub-scuola-default-rtdb.europe-west1.firebasedatabase.app";
+    const EVENT_PATH = "artifacts/incontro-scuola-famiglia-021226/public/data/appointments";
+
+    // =========================================================================
+    // 1. CONFIGURAZIONE COSTANTI E GENERAZIONE DEI 25 ORARI
+    // =========================================================================
+    const EVENT_TITLE = "Incontro scuola-famiglia 02.12.26";
+    const ADMIN_PIN = "251125";
+    const TOTAL_SLOTS = 25;
+    const START_HOUR = 17;
+    const START_MINUTE = 15;
+    const INTERVAL_MINUTES = 7;
+    const INIT_TIMEOUT_MS = 6000;
+    const FIREBASE_SDK_VERSION = "11.6.1";
+    const FIREBASE_SDK_BASE = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}`;
+
+    function generateSlots() {
+      const slots = [];
+      let totalMinutes = START_HOUR * 60 + START_MINUTE;
+      for (let i = 0; i < TOTAL_SLOTS; i++) {
+        const hh = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+        const mm = String(totalMinutes % 60).padStart(2, "0");
+        const timeStr = `${hh}:${mm}`;
+        slots.push({
+          id: `slot_${String(i).padStart(2, "0")}_${hh}${mm}`,
+          index: i,
+          time: timeStr
+        });
+        totalMinutes += INTERVAL_MINUTES;
+      }
+      return slots;
+    }
+
+    const SLOTS = generateSlots();
+
+    // Identificativo persistente del dispositivo/utente (usato per riconoscere la propria prenotazione)
+    function getOrCreateClientId() {
+      const storageKey = "franzo_scuola_client_uid_021226";
+      try {
+        let uid = localStorage.getItem(storageKey);
+        if (!uid) {
+          uid = (typeof crypto !== "undefined" && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : `user_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+          localStorage.setItem(storageKey, uid);
+        }
+        return uid;
+      } catch (e) {
+        return `user_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      }
+    }
+
+    // Stato globale
+    let currentUserId = getOrCreateClientId();
+    let bookingsMap = {}; // { slotId: { name, userId, time, createdAt } }
+    let selectedSlotToBook = null;
+    let isAdminUnlocked = false;
+    let isDatabaseReady = false;
+    let db = null;
+    let rtdbOps = null;
+
+    // Riferimenti DOM
+    const loadingIndicator = document.getElementById("loadingIndicator");
+    const statusBanner = document.getElementById("statusBanner");
+    const freeCountBadge = document.getElementById("freeCountBadge");
+    const myBookingCard = document.getElementById("myBookingCard");
+    const myBookingTime = document.getElementById("myBookingTime");
+    const myBookingName = document.getElementById("myBookingName");
+    const cancelMyBookingBtn = document.getElementById("cancelMyBookingBtn");
+    const slotsGrid = document.getElementById("slotsGrid");
+
+    const bookingModal = document.getElementById("bookingModal");
+    const modalSlotTime = document.getElementById("modalSlotTime");
+    const bookingForm = document.getElementById("bookingForm");
+    const userNameInput = document.getElementById("userNameInput");
+    const inputErrorText = document.getElementById("inputErrorText");
+    const closeModalBtn = document.getElementById("closeModalBtn");
+    const confirmBookingBtn = document.getElementById("confirmBookingBtn");
+
+    const confirmModal = document.getElementById("confirmModal");
+    const confirmTitle = document.getElementById("confirmTitle");
+    const confirmMessage = document.getElementById("confirmMessage");
+    const confirmCancelBtn = document.getElementById("confirmCancelBtn");
+    const confirmProceedBtn = document.getElementById("confirmProceedBtn");
+    let pendingConfirmCallback = null;
+
+    const toggleAdminSectionBtn = document.getElementById("toggleAdminSectionBtn");
+    const adminChevron = document.getElementById("adminChevron");
+    const adminPanel = document.getElementById("adminPanel");
+    const adminPinGate = document.getElementById("adminPinGate");
+    const adminPinInput = document.getElementById("adminPinInput");
+    const adminUnlockBtn = document.getElementById("adminUnlockBtn");
+    const adminPinError = document.getElementById("adminPinError");
+    const adminDashboard = document.getElementById("adminDashboard");
+    const adminBookedCount = document.getElementById("adminBookedCount");
+    const adminFreeCount = document.getElementById("adminFreeCount");
+    const adminBookingsList = document.getElementById("adminBookingsList");
+    const copySummaryBtn = document.getElementById("copySummaryBtn");
+    const resetAllBtn = document.getElementById("resetAllBtn");
+    const lockAdminBtn = document.getElementById("lockAdminBtn");
+
+    // =========================================================================
+    // 2. UTILITY DI NOTIFICA E CONFERMA
+    // =========================================================================
+    let bannerTimeout = null;
+    function showBanner(message, type = "info") {
+      clearTimeout(bannerTimeout);
+      statusBanner.classList.remove(
+        "hidden",
+        "bg-emerald-50", "text-emerald-900", "border-emerald-300",
+        "bg-red-50", "text-red-900", "border-red-300",
+        "bg-amber-50", "text-amber-900", "border-amber-300"
+      );
+
+      if (type === "success") {
+        statusBanner.classList.add("bg-emerald-50", "text-emerald-900", "border-emerald-300");
+      } else if (type === "error") {
+        statusBanner.classList.add("bg-red-50", "text-red-900", "border-red-300");
+      } else {
+        statusBanner.classList.add("bg-amber-50", "text-amber-900", "border-amber-300");
+      }
+
+      statusBanner.textContent = message;
+      bannerTimeout = setTimeout(() => {
+        statusBanner.classList.add("hidden");
+      }, 6500);
+    }
+
+    function openConfirmDialog(title, message, onConfirm) {
+      confirmTitle.textContent = title;
+      confirmMessage.textContent = message;
+      pendingConfirmCallback = onConfirm;
+      confirmModal.classList.remove("hidden");
+      confirmModal.classList.add("flex");
+    }
+
+    function closeConfirmDialog() {
+      confirmModal.classList.add("hidden");
+      confirmModal.classList.remove("flex");
+      pendingConfirmCallback = null;
+    }
+
+    confirmCancelBtn.addEventListener("click", closeConfirmDialog);
+    confirmProceedBtn.addEventListener("click", async () => {
+      const cb = pendingConfirmCallback;
+      closeConfirmDialog();
+      if (typeof cb === "function") {
+        await cb();
+      }
+    });
+
+    function finishLoadingUI() {
+      if (loadingIndicator) {
+        loadingIndicator.classList.add("hidden");
+      }
+    }
+
+    // =========================================================================
+    // 3. RENDERING INTERFACCIA UTENTE E AREA ORGANIZZATORE
+    // =========================================================================
+    function getMyBooking() {
+      if (!currentUserId) return null;
+      for (const slot of SLOTS) {
+        const b = bookingsMap[slot.id];
+        if (b && b.userId === currentUserId) {
+          return { slot, booking: b };
+        }
+      }
+      return null;
+    }
+
+    function renderAllUI() {
+      const bookedCount = SLOTS.filter((s) => Boolean(bookingsMap[s.id])).length;
+      const freeCount = TOTAL_SLOTS - bookedCount;
+      freeCountBadge.textContent = `${freeCount} / ${TOTAL_SLOTS} liberi`;
+
+      const myBooking = getMyBooking();
+      if (myBooking) {
+        myBookingCard.classList.remove("hidden");
+        myBookingTime.textContent = `Ore ${myBooking.slot.time}`;
+        myBookingName.textContent = myBooking.booking.name;
+      } else {
+        myBookingCard.classList.add("hidden");
+      }
+
+      slotsGrid.innerHTML = "";
+      SLOTS.forEach((slot) => {
+        const booking = bookingsMap[slot.id];
+        const isMine = booking && currentUserId && booking.userId === currentUserId;
+        const isTaken = Boolean(booking);
+
+        const cardBtn = document.createElement("button");
+        cardBtn.type = "button";
+        cardBtn.className = [
+          "w-full text-left p-4 rounded-2xl border-2 transition flex items-center justify-between gap-3 shadow-sm",
+          isMine
+            ? "bg-emerald-50 border-emerald-600 cursor-default"
+            : isTaken
+              ? "bg-slate-100 border-slate-200 cursor-not-allowed opacity-90"
+              : "bg-white border-slate-200 hover:border-emerald-500 active:scale-[0.99] cursor-pointer"
+        ].join(" ");
+
+        const leftCol = document.createElement("div");
+        leftCol.className = "flex items-center gap-3 min-w-0";
+
+        const timeBadge = document.createElement("span");
+        timeBadge.className = [
+          "text-xl font-extrabold px-3 py-1.5 rounded-xl shrink-0",
+          isMine
+            ? "bg-emerald-700 text-white"
+            : isTaken
+              ? "bg-slate-300 text-slate-700"
+              : "bg-emerald-100 text-emerald-900"
+        ].join(" ");
+        timeBadge.textContent = slot.time;
+
+        const infoCol = document.createElement("div");
+        infoCol.className = "min-w-0";
+
+        const statusLine = document.createElement("p");
+        statusLine.className = [
+          "text-base font-bold truncate",
+          isMine ? "text-emerald-900" : isTaken ? "text-slate-700" : "text-slate-900"
+        ].join(" ");
+
+        if (isMine) {
+          statusLine.textContent = `${booking.name} (Il tuo turno)`;
+        } else if (isTaken) {
+          statusLine.textContent = booking.name;
+        } else {
+          statusLine.textContent = "Disponibile";
+        }
+
+        const subLine = document.createElement("p");
+        subLine.className = "text-xs font-medium text-slate-500";
+        subLine.textContent = isMine
+          ? "Prenotato da te"
+          : isTaken
+            ? "Orario già prenotato"
+            : "Tocca per prenotare";
+
+        infoCol.appendChild(statusLine);
+        infoCol.appendChild(subLine);
+        leftCol.appendChild(timeBadge);
+        leftCol.appendChild(infoCol);
+
+        const rightBadge = document.createElement("span");
+        rightBadge.className = [
+          "text-xs font-extrabold uppercase tracking-wider px-3 py-1.5 rounded-full shrink-0",
+          isMine
+            ? "bg-emerald-700 text-white"
+            : isTaken
+              ? "bg-red-100 text-red-700"
+              : "bg-emerald-100 text-emerald-800"
+        ].join(" ");
+        rightBadge.textContent = isMine ? "TUO" : isTaken ? "OCCUPATO" : "LIBERO";
+
+        cardBtn.appendChild(leftCol);
+        cardBtn.appendChild(rightBadge);
+
+        if (!isTaken) {
+          cardBtn.addEventListener("click", () => handleSlotClick(slot));
+        } else {
+          cardBtn.disabled = true;
+        }
+
+        slotsGrid.appendChild(cardBtn);
+      });
+
+      if (isAdminUnlocked) {
+        renderAdminDashboard(bookedCount, freeCount);
+      }
+    }
+
+    function renderAdminDashboard(bookedCount, freeCount) {
+      adminBookedCount.textContent = String(bookedCount);
+      adminFreeCount.textContent = String(freeCount);
+      adminBookingsList.innerHTML = "";
+
+      SLOTS.forEach((slot) => {
+        const booking = bookingsMap[slot.id];
+        const row = document.createElement("div");
+        row.className = "flex items-center justify-between gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50";
+
+        const info = document.createElement("div");
+        info.className = "min-w-0";
+        info.innerHTML = `<span class="font-bold text-slate-900 mr-2">${slot.time}</span>` +
+          (booking
+            ? `<span class="text-slate-800 font-medium break-words">${escapeHtml(booking.name)}</span>`
+            : `<span class="text-slate-400 italic">Libero</span>`);
+
+        row.appendChild(info);
+
+        if (booking) {
+          const delBtn = document.createElement("button");
+          delBtn.type = "button";
+          delBtn.className = "text-xs font-bold text-red-700 bg-red-100 hover:bg-red-200 px-2.5 py-1.5 rounded-lg shrink-0 transition";
+          delBtn.textContent = "Libera";
+          delBtn.addEventListener("click", () => {
+            openConfirmDialog(
+              `Liberare le ${slot.time}?`,
+              `Vuoi rimuovere la prenotazione di "${booking.name}" per le ore ${slot.time}?`,
+              () => deleteSlotBooking(slot.id)
+            );
+          });
+          row.appendChild(delBtn);
+        }
+
+        adminBookingsList.appendChild(row);
+      });
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    // =========================================================================
+    // 4. INIZIALIZZAZIONE FIREBASE REALTIME DATABASE CON TIMEOUT E GESTIONE ERRORI
+    // =========================================================================
+    async function initFirebaseAndSync() {
+      let settled = false;
+
+      const timeoutId = setTimeout(() => {
+        if (!settled) {
+          finishLoadingUI();
+          renderAllUI();
+          showBanner(
+            "Connessione al database lenta o non disponibile. Controlla internet e le regole di sicurezza del Realtime Database.",
+            "error"
+          );
+        }
+      }, INIT_TIMEOUT_MS);
+
+      try {
+        const loadModuleSafely = async (moduleName) => {
+          const url = `${FIREBASE_SDK_BASE}/${moduleName}`;
+          const res = await fetch(url, { mode: "cors", cache: "default" });
+          const contentType = (res.headers.get("content-type") || "").toLowerCase();
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status} su ${moduleName}`);
+          }
+          if (contentType.includes("text/html")) {
+            throw new Error(`Risposta HTML inattesa su ${moduleName}`);
+          }
+          return await import(url);
+        };
+
+        const [appMod, dbMod] = await Promise.all([
+          loadModuleSafely("firebase-app.js"),
+          loadModuleSafely("firebase-database.js")
+        ]);
+
+        const app = appMod.initializeApp({
+          databaseURL: REALTIME_DB_URL
+        });
+
+        db = dbMod.getDatabase(app);
+        rtdbOps = dbMod;
+        isDatabaseReady = true;
+
+        const appointmentsRef = dbMod.ref(db, EVENT_PATH);
+
+        dbMod.onValue(
+          appointmentsRef,
+          (snapshot) => {
+            const val = snapshot.val();
+            bookingsMap = (val && typeof val === "object") ? val : {};
+            clearTimeout(timeoutId);
+            settled = true;
+            finishLoadingUI();
+            renderAllUI();
+          },
+          (dbErr) => {
+            console.error("Errore onValue Realtime Database:", dbErr);
+            clearTimeout(timeoutId);
+            settled = true;
+            finishLoadingUI();
+            renderAllUI();
+            showBanner(
+              "Impossibile leggere gli orari dal database: verifica che le regole del Firebase Realtime Database consentano lettura e scrittura.",
+              "error"
+            );
+          }
+        );
+      } catch (initErr) {
+        console.error("Errore inizializzazione Firebase Realtime Database:", initErr);
+        clearTimeout(timeoutId);
+        settled = true;
+        finishLoadingUI();
+        renderAllUI();
+        showBanner(
+          "Errore di collegamento a Firebase. Verifica la connessione internet e riprova.",
+          "error"
+        );
+      }
+    }
+
+    // =========================================================================
+    // 5. OPERAZIONI DI PRENOTAZIONE, ANNULLAMENTO E GESTIONE ADMIN (TRANSAZIONI)
+    // =========================================================================
+    function handleSlotClick(slot) {
+      if (!isDatabaseReady || !db || !rtdbOps) {
+        showBanner("Connessione al database non ancora attiva. Attendi un istante o ricarica la pagina.", "error");
+        return;
+      }
+
+      const existing = getMyBooking();
+      if (existing) {
+        showBanner(
+          `Hai già prenotato le ore ${existing.slot.time} (${existing.booking.name}). Annulla prima quello se vuoi cambiare orario.`,
+          "info"
+        );
+        myBookingCard.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+
+      selectedSlotToBook = slot;
+      modalSlotTime.textContent = slot.time;
+      userNameInput.value = "";
+      inputErrorText.classList.add("hidden");
+      bookingModal.classList.remove("hidden");
+      bookingModal.classList.add("flex");
+      setTimeout(() => userNameInput.focus(), 80);
+    }
+
+    function closeBookingModal() {
+      bookingModal.classList.add("hidden");
+      bookingModal.classList.remove("flex");
+      selectedSlotToBook = null;
+    }
+
+    closeModalBtn.addEventListener("click", closeBookingModal);
+    bookingModal.addEventListener("click", (e) => {
+      if (e.target === bookingModal) closeBookingModal();
+    });
+
+    bookingForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!selectedSlotToBook || !db || !rtdbOps) return;
+
+      const rawName = userNameInput.value.trim().replace(/\s+/g, " ");
+      if (rawName.length < 2) {
+        inputErrorText.classList.remove("hidden");
+        userNameInput.focus();
+        return;
+      }
+      inputErrorText.classList.add("hidden");
+
+      const currentExisting = getMyBooking();
+      if (currentExisting) {
+        closeBookingModal();
+        showBanner(`Hai già una prenotazione attiva alle ${currentExisting.slot.time}.`, "info");
+        return;
+      }
+
+      confirmBookingBtn.disabled = true;
+      confirmBookingBtn.textContent = "Salvataggio...";
+
+      const slotToSave = selectedSlotToBook;
+      const slotRef = rtdbOps.ref(db, `${EVENT_PATH}/${slotToSave.id}`);
+
+      try {
+        const result = await rtdbOps.runTransaction(slotRef, (currentData) => {
+          if (currentData !== null) {
+            // Slot già occupato da un altro utente nel frattempo: annulla la transazione
+            return;
+          }
+          return {
+            name: rawName,
+            userId: currentUserId,
+            time: slotToSave.time,
+            createdAt: Date.now()
+          };
+        });
+
+        closeBookingModal();
+        if (result.committed) {
+          showBanner(`Perfetto! Appuntamento confermato per ${rawName} alle ore ${slotToSave.time}.`, "success");
+        } else {
+          showBanner("Peccato! Qualcuno ha appena prenotato questo orario un istante fa. Scegline un altro.", "error");
+        }
+      } catch (err) {
+        console.error("Errore prenotazione:", err);
+        showBanner("Errore durante il salvataggio della prenotazione. Controlla i permessi del database.", "error");
+      } finally {
+        confirmBookingBtn.disabled = false;
+        confirmBookingBtn.textContent = "Conferma";
+      }
+    });
+
+    cancelMyBookingBtn.addEventListener("click", () => {
+      const myBooking = getMyBooking();
+      if (!myBooking) return;
+
+      openConfirmDialog(
+        "Annullare il tuo appuntamento?",
+        `Vuoi liberare l'orario delle ${myBooking.slot.time} prenotato a nome "${myBooking.booking.name}"?`,
+        () => deleteSlotBooking(myBooking.slot.id, true)
+      );
+    });
+
+    async function deleteSlotBooking(slotId, isSelfCancel = false) {
+      if (!db || !rtdbOps) return;
+      try {
+        const slotRef = rtdbOps.ref(db, `${EVENT_PATH}/${slotId}`);
+        await rtdbOps.remove(slotRef);
+        showBanner(
+          isSelfCancel
+            ? "La tua prenotazione è stata annullata. Ora puoi scegliere un altro orario."
+            : "Orario liberato con successo.",
+          "success"
+        );
+      } catch (err) {
+        console.error("Errore cancellazione slot:", err);
+        showBanner("Impossibile cancellare la prenotazione. Riprova.", "error");
+      }
+    }
+
+    // =========================================================================
+    // 6. AREA ORGANIZZATORE (PIN, COPIA ELENCO WHATSAPP, RESET COMPLETO)
+    // =========================================================================
+    toggleAdminSectionBtn.addEventListener("click", () => {
+      const isHidden = adminPanel.classList.contains("hidden");
+      adminPanel.classList.toggle("hidden", !isHidden);
+      adminChevron.textContent = isHidden ? "▲" : "▼";
+    });
+
+    function tryUnlockAdmin() {
+      const entered = adminPinInput.value.trim();
+      if (entered === ADMIN_PIN) {
+        isAdminUnlocked = true;
+        adminPinError.classList.add("hidden");
+        adminPinGate.classList.add("hidden");
+        adminDashboard.classList.remove("hidden");
+        adminPinInput.value = "";
+        renderAllUI();
+      } else {
+        adminPinError.classList.remove("hidden");
+        adminPinInput.focus();
+      }
+    }
+
+    adminUnlockBtn.addEventListener("click", tryUnlockAdmin);
+    adminPinInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        tryUnlockAdmin();
+      }
+    });
+
+    lockAdminBtn.addEventListener("click", () => {
+      isAdminUnlocked = false;
+      adminDashboard.classList.add("hidden");
+      adminPinGate.classList.remove("hidden");
+    });
+
+    copySummaryBtn.addEventListener("click", () => {
+      const lines = [`📅 *${EVENT_TITLE}*`, ""];
+      SLOTS.forEach((slot) => {
+        const b = bookingsMap[slot.id];
+        lines.push(`• *${slot.time}* — ${b ? b.name : "_Libero_"}`);
+      });
+      const textToCopy = lines.join("\n");
+
+      const tempArea = document.createElement("textarea");
+      tempArea.value = textToCopy;
+      tempArea.style.position = "fixed";
+      tempArea.style.opacity = "0";
+      document.body.appendChild(tempArea);
+      tempArea.select();
+      try {
+        document.execCommand("copy");
+        showBanner("Elenco copiato! Ora puoi incollarlo direttamente nella chat WhatsApp.", "success");
+      } catch (err) {
+        showBanner("Impossibile copiare automaticamente l'elenco.", "error");
+      }
+      document.body.removeChild(tempArea);
+    });
+
+    resetAllBtn.addEventListener("click", () => {
+      openConfirmDialog(
+        "Azzerare TUTTE le prenotazioni?",
+        "Attenzione: tutti i 25 orari torneranno liberi e i nomi inseriti verranno cancellati definitivamente.",
+        async () => {
+          if (!db || !rtdbOps) return;
+          try {
+            const rootRef = rtdbOps.ref(db, EVENT_PATH);
+            await rtdbOps.remove(rootRef);
+            showBanner("Tutti i 25 appuntamenti sono stati azzerati.", "success");
+          } catch (err) {
+            console.error("Errore reset totale:", err);
+            showBanner("Errore durante l'azzeramento delle prenotazioni.", "error");
+          }
+        }
+      );
+    });
+
+    // Avvio applicazione
+    initFirebaseAndSync();
+  </script>
+</body>
+</html>
